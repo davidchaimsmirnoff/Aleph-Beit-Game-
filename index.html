@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hebrew Alphabet Collection Game</title>
+    <style>
+        body { margin: 0; background-color: black; color: white; font-family: Arial, sans-serif; }
+        canvas { display: block; background: #000; margin: 0 auto;   width: 50%;        height: auto; /* Maintain aspect ratio */
+        }
+        #info {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 24px;
+        }
+        #inventory {
+            text-align: center;
+            margin: 10px 0;
+        }
+        #congratulations {
+            text-align: center;
+            font-size: 32px;
+            margin-top: 20px;
+            display: none;
+        }
+        #restartButton {
+            display: none;
+            margin: 0 auto;
+            display: block;
+            padding: 10px 20px;
+            font-size: 20px;
+            cursor: pointer;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        #instructions {
+            margin-top: 20px;
+            text-align: center;
+            margin: 20px 0;
+            font-size: 20px;
+        }
+        #controlsContainer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 10px;
+        }
+        #wasdKeys, #arrowKeys {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 20px;
+        }
+        .arrowKey, .wasdKey {
+            width: 50px;
+            height: 50px;
+            margin: 5px;
+            background-color: #28a745;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .wasdKey {
+            background-color: #99ffff;
+            color: black;
+        }
+        #startMusicButton {
+            display: none;
+            margin: 10px auto;
+            padding: 8px 16px;
+            font-size: 18px;
+            cursor: pointer;
+            background-color: red;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            text-align: center;
+            width: 150px;
+        }
+        #multiplayerButton {
+            display: block;
+            margin: 10px auto;
+            padding: 10px 20px;
+            font-size: 20px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Find the letter: <span id="targetLetter">א (Aleph)</span></div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="inventory">Inventory: <span id="inventoryList"></span></div>
+    <div id="congratulations">Congratulations! You've completed the game. Would you like to restart and practice again?</div>
+    <button id="restartButton">Restart Game</button>
+    
+    <!-- Placeholder div that will be replaced by the start/stop music button -->
+    <div id="musicButtonPlaceholder"></div>
+    
+    <!-- Start Music Button -->
+    <div id="startMusicButton">Stop Music</div>
+
+    <!-- Instructions and Arrow Keys -->
+    <div id="instructions">How to play: Use the arrow keys or WSAD Keys to move the player around to the correct Hebrew letter that matches the prompt above.</div>
+    
+    <div id="controlsContainer">
+        <!-- WASD Keys -->
+        <div id="wasdKeys">
+            <div class="wasdKey">W</div>
+            <div style="display: flex;">
+                <div class="wasdKey">A</div>
+                <div class="wasdKey">S</div>
+                <div class="wasdKey">D</div>
+            </div>
+        </div>
+        
+        <!-- Arrow Keys -->
+        <div id="arrowKeys">
+            <div class="arrowKey">↑</div>
+            <div style="display: flex;">
+                <div class="arrowKey">←</div>
+                <div class="arrowKey">↓</div>
+                <div class="arrowKey">→</div>
+            </div>
+        </div>
+    </div>
+
+    <button id="multiplayerButton">Multiplayer</button>
+   
+    <!-- Background Music Element -->
+    <audio id="bgMusic" src="./name.wav" loop preload="auto"></audio>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const targetLetterSpan = document.getElementById('targetLetter');
+        const inventoryListSpan = document.getElementById('inventoryList');
+        const bgMusic = document.getElementById('bgMusic');
+        const startMusicButton = document.getElementById('startMusicButton');
+        const congratulationsDiv = document.getElementById('congratulations');
+        const restartButton = document.getElementById('restartButton');
+
+        canvas.width = 640;
+        canvas.height = 480;
+
+        const dingSoundUrl = 'https://www.myinstants.com/media/sounds/ding-sound-effect_2.mp3';
+
+        const tileSize = 32;
+        const mapWidth = 20;
+        const mapHeight = 15;
+
+        let player1 = {
+            x: 2,
+            y: 12,
+            color: 'blue'
+        };
+        
+        let firstMove = true;
+	    let player2 = null; 
+
+        let roundsCompleted = 0;
+        let currentLevel = 0;
+        let currentTargetIndex = 0;
+        let inventory = [];
+        let gameCompleted = false;
+
+        const levels = [
+            {
+                map: [
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+                ],
+                letters: [
+                    { x: 2, y: 2, symbol: 'א', name: 'Aleph' },
+                    { x: 4, y: 2, symbol: 'ב', name: 'Bet' },
+                    { x: 6, y: 2, symbol: 'ג', name: 'Gimel' },
+                    { x: 8, y: 2, symbol: 'ד', name: 'Dalet' },
+                    { x: 10, y: 2, symbol: 'ה', name: 'He' },
+                    { x: 12, y: 2, symbol: 'ו', name: 'Vav' },
+                    { x: 14, y: 2, symbol: 'ז', name: 'Zayin' },
+                    { x: 16, y: 2, symbol: 'ח', name: 'Het' },
+                    { x: 18, y: 2, symbol: 'ט', name: 'Tet' },
+                    { x: 2, y: 4, symbol: 'י', name: 'Yod' },
+                    { x: 4, y: 4, symbol: 'כ', name: 'Kaf' },
+                    { x: 6, y: 4, symbol: 'ל', name: 'Lamed' },
+                    { x: 8, y: 4, symbol: 'מ', name: 'Mem' },
+                    { x: 10, y: 4, symbol: 'נ', name: 'Nun' },
+                    { x: 12, y: 4, symbol: 'ס', name: 'Samekh' },
+                    { x: 14, y: 4, symbol: 'ע', name: 'Ayin' },
+                    { x: 16, y: 4, symbol: 'פ', name: 'Pe' },
+                    { x: 18, y: 4, symbol: 'צ', name: 'Tsade' },
+                    { x: 2, y: 6, symbol: 'ק', name: 'Qof' },
+                    { x: 4, y: 6, symbol: 'ר', name: 'Resh' },
+                    { x: 6, y: 6, symbol: 'ש', name: 'Shin' },
+                    { x: 8, y: 6, symbol: 'ת', name: 'Tav' }
+                ]
+            }
+        ];
+
+        function loadLevel(levelIndex) {
+            if (levelIndex < levels.length) {
+                const level = levels[levelIndex];
+
+                if (levelIndex > 0) {
+                    shuffleLetters(level.letters);  // Shuffle the letters after the first level
+                }
+                currentTargetIndex = 0;
+                inventory = []; // Reset the inventory for each level
+                targetLetterSpan.textContent = `${level.letters[currentTargetIndex].symbol} (${level.letters[currentTargetIndex].name})`;
+                update();  // Update the game state after loading a level
+            } else {
+                console.error('Level index out of range');
+            }
+        }
+
+        // Helper function to shuffle letters within the level
+        function shuffleLetters(letters) {
+            for (let i = letters.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [letters[i].x, letters[j].x] = [letters[j].x, letters[i].x];
+                [letters[i].y, letters[j].y] = [letters[j].y, letters[i].y];
+            }
+        }
+
+        function checkForLetter(player) {
+            const level = levels[currentLevel];
+            const targetLetter = level.letters[currentTargetIndex];
+
+            if (player.x === targetLetter.x && player.y === targetLetter.y) {
+                playDingSound();  // Play sound upon collecting a letter
+                inventory.push(targetLetter.symbol);
+                updateInventoryDisplay();
+
+                currentTargetIndex++;
+
+                if (currentTargetIndex < level.letters.length) {
+                    targetLetterSpan.textContent = `${level.letters[currentTargetIndex].symbol} (${level.letters[currentTargetIndex].name})`;
+                } else {
+                    if (currentLevel < levels.length - 1) {
+                        currentLevel++;
+                        loadLevel(currentLevel);  // Load the next level and shuffle if needed
+                        resetPlayers();  // Reset player positions for the new level
+                    } else {
+                        gameCompleted = true;
+                        displayCongratulations(); // Show congratulations message and restart options
+                    }
+                }
+            }
+        }
+
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawMap();
+            drawPlayer(player1);
+            if (player2) {
+                drawPlayer(player2);
+            }
+            drawLetters();
+        }
+
+        function drawMap() {
+            const map = levels[currentLevel].map;
+            if (map) {
+                for (let y = 0; y < mapHeight; y++) {
+                    for (let x = 0; x < mapWidth; x++) {
+                        ctx.fillStyle = map[y][x] === 1 ? 'green' : 'grey';
+                        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                    }
+                }
+            } else {
+                console.error('Map data is undefined');
+            }
+        }
+
+        function drawPlayer(player) {
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x * tileSize, player.y * tileSize, tileSize, tileSize);
+        }
+
+        function drawLetters() {
+            ctx.font = '24px Arial';
+            ctx.fillStyle = 'white';
+            const letters = levels[currentLevel].letters;
+            if (letters) {
+                letters.forEach(letter => {
+                    if (!inventory.includes(letter.symbol)) {
+                        ctx.fillText(letter.symbol, letter.x * tileSize + 8, letter.y * tileSize + 24);
+                    }
+                });
+            } else {
+                console.error('Letters data is undefined');
+            }
+        }
+
+        function playDingSound() {
+            const dingSound = new Audio(dingSoundUrl);
+            dingSound.volume = 0.1;
+            dingSound.play();
+        }
+
+        function movePlayer(player, dx, dy) {
+            const map = levels[currentLevel].map;
+            if (map && !gameCompleted) {
+                const newX = player.x + dx;
+                const newY = player.y + dy;
+
+                if (newX >= 0 && newX < mapWidth && newY >= 0 && newY < mapHeight && map[newY][newX] === 0) {
+                    player.x = newX;
+                    player.y = newY;
+                    checkForLetter(player);
+
+                    if (firstMove) {
+                        firstMove = false;
+                        setTimeout(() => {
+                            bgMusic.currentTime = 3;
+                            bgMusic.play();
+                            bgMusic.volume = 0.2;
+                            startMusicButton.style.display = 'block';
+                            startMusicButton.textContent = 'Stop Music';
+                        }, 0);
+                    }
+                }
+            }
+        }
+
+        function resetPlayers() {
+            player1 = { x: 2, y: 12, color: 'blue' };
+            if (player2) {
+                player2 = { x: 18, y: 12, color: 'purple' };
+            }
+            update(); 
+        }
+
+        function displayCongratulations() {
+            roundsCompleted++;
+            if (roundsCompleted < 10) {
+                gameCompleted = false;
+                resetPlayers(); 
+                currentTargetIndex = 0;
+                inventory = [];
+                loadLevel(currentLevel); 
+                updateInventoryDisplay(); 
+            } else {
+                targetLetterSpan.textContent = "Congratulations! You've won the game!";
+                congratulationsDiv.style.display = 'block';
+                restartButton.style.display = 'block';
+                update();
+            }
+        }
+
+        function updateInventoryDisplay() {
+            inventoryListSpan.textContent = inventory.join(', ');
+            inventoryListSpan.textContent += ` | Completed ${roundsCompleted}/10`;
+        }
+
+        restartButton.addEventListener('click', () => {
+            currentLevel = 0;
+            gameCompleted = false;
+            congratulationsDiv.style.display = 'none';
+            restartButton.style.display = 'none';
+            player1 = { x: 2, y: 12, color: 'blue' };
+            inventory = [];
+            loadLevel(currentLevel);
+            updateInventoryDisplay();
+        });
+
+        startMusicButton.addEventListener('click', () => {
+            if (bgMusic.paused) {
+                bgMusic.play();
+                startMusicButton.textContent = 'Stop Music';
+            } else {
+                bgMusic.pause();
+                startMusicButton.textContent = 'Start Music';
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (!gameCompleted) {
+                switch (event.key) {
+                    case 'ArrowUp':
+                    case 'w':
+                    case 'W':
+                        movePlayer(player1, 0, -1);
+                        break;
+                    case 'ArrowDown':
+                    case 's':
+                    case 'S':
+                        movePlayer(player1, 0, 1);
+                        break;
+                    case 'ArrowLeft':
+                    case 'a':
+                    case 'A':
+                        movePlayer(player1, -1, 0);
+                        break;
+                    case 'ArrowRight':
+                    case 'd':
+                    case 'D':
+                        movePlayer(player1, 1, 0);
+                        break;
+                }
+                update();
+            }
+        });
+
+        multiplayerButton.addEventListener('click', () => {
+            if (!player2) {
+                player2 = { x: 18, y: 12, color: 'purple' };
+                update();
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (!gameCompleted) {
+                switch (event.key) {
+                    case 'ArrowUp':
+                        movePlayer(player1, 0, -1);
+                        break;
+                    case 'ArrowDown':
+                        movePlayer(player1, 0, 1);
+                        break;
+                    case 'ArrowLeft':
+                        movePlayer(player1, -1, 0);
+                        break;
+                    case 'ArrowRight':
+                        movePlayer(player1, 1, 0);
+                        break;
+                    case 'w':
+                    case 'W':
+                        if (player2) movePlayer(player2, 0, -1);
+                        break;
+                    case 's':
+                    case 'S':
+                        if (player2) movePlayer(player2, 0, 1);
+                        break;
+                    case 'a':
+                    case 'A':
+                        if (player2) movePlayer(player2, -1, 0);
+                        break;
+                    case 'd':
+                    case 'D':
+                        if (player2) movePlayer(player2, 1, 0);
+                        break;
+                }
+                update();
+            }
+        });
+
+      
+        loadLevel(currentLevel);
+
+        
+    </script>
+</body>
+</html>
